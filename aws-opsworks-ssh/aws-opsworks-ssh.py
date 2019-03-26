@@ -13,13 +13,11 @@
 import json
 import re
 import subprocess
-import ConfigParser
+
+CONFIG_JSON="/Users/andras/work/helyes/bitbar-plugins/aws-opsworks-ssh/.secrets.json"
 
 # requires mocked json response. Check describestackTestMode.mockFile
-TEST_MODE=True
-
-AWS_CLI_PROFILE='default'
-AWS_REGION='us-east-1'
+TEST_MODE=False
 
 # show instances only. All conditions must match
 INCLUDE_FILTERS=[ {'Hostname': '^rails-.*|^delayed-.*'}, {'Status': '^.*'}]
@@ -27,15 +25,20 @@ INCLUDE_FILTERS=[ {'Hostname': '^rails-.*|^delayed-.*'}, {'Status': '^.*'}]
 #EXCLUDE_FILTERS=[ {'Status': '^stopped'} ]
 EXCLUDE_FILTERS=[ ]
 
-AWS_STACK_IDS=[ {'Production': '25890516-aad3-4ee7-8697-573e89a1d98b'}, 
-                {'Staging': 'e14492e0-b704-4b29-905e-df4af7e42ec8'}, 
-                {'Development': 'df8e5d9f-b068-45a5-8664-96b9cf4fc068'}
-               ]
+def loadConfig():
+  f=open(CONFIG_JSON, "r")
+  content =f.read()  
+  f.close()
+  ret = json.loads(content)
+  return ret
 
-#INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i /Users/andras/.ssh/aws-shiftcare.pem -t andrasshiftcarecom@##{PublicIp}## 'cd /srv/www/shiftcare/current; sudo su; bash -l'"},
+CONFIG=loadConfig()
+
+#INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i /Users/andras/.ssh/aws-shiftcare.pem -t andrasshiftcarecom@##{PublicIp}##  param1=cd /srv/www/shiftcare/current; sudo su; bash -l"},
 INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME)@##{PublicIp}##"},
                     { 'DB:5433' : 'ssh -L 5433:$(ctae.sh -g shiftcare_rds_host):5432 -i $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME)@##{PublicIp}##'}
                   ]
+
 
 def describestackTestMode(stack_id):
   mockFile="/tmp/describedstack-" + stack_id + ".json"
@@ -45,7 +48,7 @@ def describestackTestMode(stack_id):
   return contents
 
 def describestackAws(stack_id):
-  bashCommand = "aws --profile " + AWS_CLI_PROFILE + " opsworks --region " + AWS_REGION + " describe-instances --stack-id " + stack_id
+  bashCommand = CONFIG["AWS_CLI_EXECUTABLE"] + " --profile " + CONFIG["AWS_CLI_PROFILE"] + " opsworks --region " + CONFIG["AWS_REGION"] + " describe-instances --stack-id " + stack_id
   process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
   output, error = process.communicate()
   return output
@@ -94,7 +97,7 @@ def buildMenu(stackName, stackId):
   menuStack = sorted(menuStack, key=lambda k: k['Hostname'])     
   menu.append({stackName: menuStack})
 
-for stackId in AWS_STACK_IDS:
+for stackId in CONFIG["STACKS"]:
   buildMenu(stackId.keys()[0], stackId.values()[0])
 
 # static menu
