@@ -10,14 +10,14 @@
 # <bitbar.dependencies>python, aws-cli</bitbar.dependencies>
 # <bitbar.abouturl>https://github.com/helyes/bitbar-plugins/blob/master/aws-opsworks-ssh/aws-opsworks-ssh.py</bitbar.abouturl>
 
+import datetime
 import json
+import os
 import re
 import subprocess
+import sys
 
-CONFIG_JSON="/Users/andras/work/helyes/bitbar-plugins/aws-opsworks-ssh/.secrets.json"
-
-# requires mocked json response. Check describestackTestMode.mockFile
-TEST_MODE=False
+CONFIG_FILE="/Users/andras/work/helyes/bitbar-plugins/aws-opsworks-ssh/.secrets.json"
 
 # show instances only. All conditions must match
 INCLUDE_FILTERS=[ {'Hostname': '^rails-.*|^delayed-.*'}, {'Status': '^.*'}]
@@ -26,11 +26,14 @@ INCLUDE_FILTERS=[ {'Hostname': '^rails-.*|^delayed-.*'}, {'Status': '^.*'}]
 EXCLUDE_FILTERS=[ ]
 
 def loadConfig():
-  f=open(CONFIG_JSON, "r")
-  content =f.read()  
-  f.close()
-  ret = json.loads(content)
-  return ret
+  try:
+    with open(CONFIG_FILE, 'r') as f:
+      content =f.read()
+      return json.loads(content)
+  except IOError:
+      print 'Error'
+      print 'Cannot open/parse config file: ' + CONFIG_FILE
+
 
 CONFIG=loadConfig()
 
@@ -39,25 +42,44 @@ INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i $(ctae.sh -g CO
                     { 'DB:5433' : 'ssh -L 5433:$(ctae.sh -g shiftcare_rds_host):5432 -i $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME)@##{PublicIp}##'}
                   ]
 
+def saveStackDescription (stackId, stackDescription):
+  stackFile=buildTempFilePathForStackId(stackId)
+  parentDirectory=os.path.abspath(os.path.join(stackFile, '..'))
+  try:
+    if not os.path.exists(parentDirectory):
+      os.makedirs(parentDirectory)
 
-def describestackTestMode(stack_id):
-  mockFile="/tmp/describedstack-" + stack_id + ".json"
-  f=open(mockFile, "r")
-  contents =f.read()
-  f.close()
-  return contents
+    with open(stackFile, 'w+') as f:
+      f.write(stackDescription)
+  except IOError:
+      print 'Error'
+      print ('Could not save: ', stackFile)
+
+def buildTempFilePathForStackId(stackId):
+  return '/tmp/bitbar-aws-opsworks-ssh/stackdescription-' + stackId + '.json'
+
+def loadStackDescription(stackId):
+  try:
+    with open(buildTempFilePathForStackId(stackId), 'r') as f:
+      content =f.read()
+      return content
+  except IOError:
+      print 'Error'
+      print 'Cannot open/parse config file: ' + CONFIG_FILE
+
 
 def describestackAws(stack_id):
   bashCommand = CONFIG["AWS_CLI_EXECUTABLE"] + " --profile " + CONFIG["AWS_CLI_PROFILE"] + " opsworks --region " + CONFIG["AWS_REGION"] + " describe-instances --stack-id " + stack_id
   process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
   output, error = process.communicate()
+  saveStackDescription(stack_id, output)
   return output
 
-def describestack(stack_id):
-  if TEST_MODE:
-    return json.loads(describestackTestMode(stack_id))["Instances"]
+def describestack(stackId):
+  if os.path.isfile(buildTempFilePathForStackId(stackId)):
+    return json.loads(loadStackDescription(stackId))["Instances"]
   else:
-    return json.loads(describestackAws(stack_id))["Instances"]
+    return json.loads(describestackAws(stackId))["Instances"]
 
 def normalizeCommand(command, instanceDescription):
   ret = command
@@ -85,6 +107,15 @@ def isInstancePlaying (instanceDescription):
 
   return True
   
+def inValidateCache():
+  tmpFileDirectory=os.path.abspath(os.path.join(buildTempFilePathForStackId("notrelevant"), '..'))
+  filelist = [ f for f in os.listdir(tmpFileDirectory) if f.endswith(".json") ]
+  for f in filelist:
+    os.remove(os.path.join(tmpFileDirectory, f))
+
+
+if len(sys.argv) > 1 and sys.argv[1] == 'inValidateCache':
+   inValidateCache()
 
 menu = []
 def buildMenu(stackName, stackId):
@@ -103,8 +134,9 @@ for stackId in CONFIG["STACKS"]:
 # static menu
 print "OPS"
 print "---"
-if TEST_MODE:
-  print ('Testmode')
+
+lastUpdated = os.path.getmtime(os.path.abspath(os.path.join(buildTempFilePathForStackId("notrelevant"), '..')))
+print('As of {0:%Y-%m-%d %H:%M}'.format(datetime.datetime.fromtimestamp(lastUpdated)))
 
 # menu
 for elements in menu:
@@ -120,3 +152,6 @@ for elements in menu:
         print '----' + instanceCommand.keys()[0] 
 
 print "Refresh | terminal=false refresh=true"
+# without that, auto refresh would refresh tempfile when app started
+# It may take a while so sticking with on demand manual refresh
+print "Refresh remote | bash=" + os.path.abspath(sys.argv[0]) + " param1=inValidateCache terminal=false refresh=true"
