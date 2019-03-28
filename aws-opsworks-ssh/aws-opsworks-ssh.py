@@ -19,12 +19,6 @@ import sys
 
 CONFIG_FILE="/Users/andras/work/helyes/bitbar-plugins/aws-opsworks-ssh/.secrets.json"
 
-# show instances only. All conditions must match
-INCLUDE_FILTERS=[ {'Hostname': '^rails-.*|^delayed-.*'}, {'Status': '^.*'}]
-
-#EXCLUDE_FILTERS=[ {'Status': '^stopped'} ]
-EXCLUDE_FILTERS=[ ]
-
 def loadConfig():
   try:
     with open(CONFIG_FILE, 'r') as f:
@@ -34,13 +28,8 @@ def loadConfig():
       print 'Error'
       print 'Cannot open/parse config file: ' + CONFIG_FILE
 
-
 CONFIG=loadConfig()
 
-#INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i /Users/andras/.ssh/aws-shiftcare.pem -t andrasshiftcarecom@##{PublicIp}##  param1=cd /srv/www/shiftcare/current; sudo su; bash -l"},
-INSTANCE_COMMANDS=[ { 'SSH' : "ssh -oStrictHostKeyChecking=no -i $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME)@##{PublicIp}##"},
-                    { 'DB:5433' : 'ssh -L 5433:$(ctae.sh -g shiftcare_rds_host):5432 -i $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME)@##{PublicIp}##'}
-                  ]
 
 def saveStackDescription (stackId, stackDescription):
   stackFile=buildTempFilePathForStackId(stackId)
@@ -96,17 +85,19 @@ def normalizeCommand(command, instanceDescription):
 def isInstancePlaying (instanceDescription):
   
   # check includes - returns false if key is missing or does not match
-  for filter in INCLUDE_FILTERS:
+  for filter in CONFIG["INSTANCE_INCLUDE_FILTERS"]:
     if not filter.keys()[0] in instanceDescription or not re.search(filter.values()[0], instanceDescription[filter.keys()[0]]):
       return False
   
   # check excludes - return false if key exists and matches
-  for filter in EXCLUDE_FILTERS:
+  for filter in CONFIG["INSTANCE_EXCLUDE_FILTERS"]:
     if filter.keys()[0] in instanceDescription and re.search(filter.values()[0], instanceDescription[filter.keys()[0]]):
       return False
-
   return True
-  
+
+def isOnline (instanceDescription):
+  return inst.get('Status', 'unknown') == 'online'
+
 def inValidateCache():
   tmpFileDirectory=os.path.abspath(os.path.join(buildTempFilePathForStackId("notrelevant"), '..'))
   filelist = [ f for f in os.listdir(tmpFileDirectory) if f.endswith(".json") ]
@@ -142,14 +133,27 @@ print('As of {0:%Y-%m-%d %H:%M}'.format(datetime.datetime.fromtimestamp(lastUpda
 for elements in menu:
   print elements.keys()[0]
   for inst in elements[elements.keys()[0]]:
-    #color='green' if inst['Status'] == 'online' else 'red'
-    print "--" + inst['Hostname'] + " | color=" + ('green' if inst['Status'] == 'online' else 'red')
-    for instanceCommand in INSTANCE_COMMANDS:
-      normalizedCommand = normalizeCommand(instanceCommand.values()[0], inst)
-      if normalizedCommand != "N/A":
-        print '----' + instanceCommand.keys()[0] + ' | bash="' + normalizedCommand + '" terminal=true' 
-      else:
-        print '----' + instanceCommand.keys()[0] 
+    print "--" + inst['Hostname'] + " | color=" + ('green' if isOnline(inst) else 'red')
+    if (not isOnline(inst)):
+      continue
+
+    for instanceCommand in CONFIG['INSTANCE_ACTIONS']:
+      # skip command if stack does not match
+      if (instanceCommand.get('stack', elements.keys()[0]) != elements.keys()[0] ):
+        continue
+
+      if instanceCommand['type'] == 'command':
+        normalizedCommand = normalizeCommand(instanceCommand['executable'], inst)
+        if normalizedCommand != "N/A":
+          print "---- %s | bash='%s' terminal=true" % (instanceCommand['label'], normalizedCommand)
+      elif instanceCommand['type'] == 'script':
+        normalizedCommand = normalizeCommand(instanceCommand['executable'], inst)
+        params = []
+        if normalizedCommand != "N/A":
+          for i in range(len(instanceCommand['params'])):
+            normalizedParam = normalizeCommand(instanceCommand['params'][i], inst)
+            params.append( "param" + str(i+1) + "=" + normalizedParam)
+          print "---- %s | bash='%s' %s terminal=true" % (instanceCommand['label'], normalizedCommand, " ".join(params))
 
 print "Refresh | terminal=false refresh=true"
 # without that, auto refresh would refresh tempfile when app started

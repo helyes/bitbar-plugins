@@ -1,0 +1,37 @@
+{
+  "AWS_CLI_EXECUTABLE": "/usr/local/bin/aws",
+  "AWS_CLI_PROFILE": "default",
+  "AWS_REGION": "us-east-1",
+  
+  "STACKS": [
+    {"Staging": "e1234567-1234-1234-1234-123456789012"}
+  ],
+
+  # show instances only. All conditions must match 
+  "INSTANCE_INCLUDE_FILTERS" : [ 
+    {"Hostname": "^rails-.*|^delayed-.*"}, 
+    {"Status": "^online"}
+  ],
+  
+  # exlcude instances
+  "INSTANCE_EXCLUDE_FILTERS" : [ ],
+
+  
+  "INSTANCE_ACTIONS": [ 
+    { "label" : "SSH",
+      "type": "command",
+      "executable": "ssh -oStrictHostKeyChecking=no -i /Users/foo/.ssh/aws-mycompany.pem awsusername@##{PublicIp}##"
+    },
+    { "label" : "PORT forward 5433:5432",
+      "type": "command",
+      "stack": "Production",
+      "executable": "ssh -L 5433:192.168.1.2:5432 -i /Users/foo/.ssh/aws-mycompany.pem awsusername@##{PublicIp}##"
+    },
+    { "label" : "ssh via scipt",
+      "type": "script",
+      "executable": "/Users/foo/myscript.sh",
+      "params": [ "##{PublicIp}##"]
+    }
+  ]
+
+}
