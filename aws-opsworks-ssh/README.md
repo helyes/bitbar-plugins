@@ -6,4 +6,6 @@ Shows opswork instance statuses and execute scripts<br>
 
 ## Configuration
 
+Run script in terminal
+` ./aws-opsworks-ssh/aws-opsworks-ssh.py`
 

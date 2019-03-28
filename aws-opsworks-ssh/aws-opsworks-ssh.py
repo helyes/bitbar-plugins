@@ -9,6 +9,7 @@
 # <bitbar.image>https://github.com/helyes/bitbar-plugins/raw/master/aws-opsworks-ssh/bitbar-image-aws-opsworks-ssh.py.png</bitbar.image>
 # <bitbar.dependencies>python, aws-cli</bitbar.dependencies>
 # <bitbar.abouturl>https://github.com/helyes/bitbar-plugins/blob/master/aws-opsworks-ssh/aws-opsworks-ssh.py</bitbar.abouturl>
+# ./aws-opsworks-ssh/aws-opsworks-ssh.py
 
 import datetime
 import json
