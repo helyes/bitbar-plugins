@@ -60,6 +60,7 @@ def loadStackDescription(stackId):
 
 def describestackAws(stack_id):
   bashCommand = CONFIG["AWS_CLI_EXECUTABLE"] + " --profile " + CONFIG["AWS_CLI_PROFILE"] + " opsworks --region " + CONFIG["AWS_REGION"] + " describe-instances --stack-id " + stack_id
+  # print bashCommand
   process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
   output, error = process.communicate()
   saveStackDescription(stack_id, output)

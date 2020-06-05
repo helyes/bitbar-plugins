@@ -26,8 +26,8 @@ pre_start() {
     echo "Initializing nvm..." >> "${LOG_FILE}"
     export NVM_DIR="${HOME}/.nvm" >> "${LOG_FILE}" 2>&1
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >> "${LOG_FILE}" 2>&1
-    echo "Setting node 6.14 ..." >> "${LOG_FILE}"
-    nvm use 6.14 >> "${LOG_FILE}" 2>&1
+    echo "Setting node 12.16 ..." >> "${LOG_FILE}"
+    nvm use 12.16 >> "${LOG_FILE}" 2>&1
     #env >> "${LOG_FILE}"
 }
 
