@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # <bitbar.title>Opsworks ec2 wizard</bitbar.title>
@@ -26,11 +26,10 @@ def loadConfig():
       content =f.read()
       return json.loads(content)
   except IOError:
-      print 'Error'
-      print 'Cannot open/parse config file: ' + CONFIG_FILE
+      print ('Error')
+      print ('Cannot open/parse config file: ' + CONFIG_FILE)
 
 CONFIG=loadConfig()
-
 
 def saveStackDescription (stackId, stackDescription):
   stackFile=buildTempFilePathForStackId(stackId)
@@ -39,10 +38,10 @@ def saveStackDescription (stackId, stackDescription):
     if not os.path.exists(parentDirectory):
       os.makedirs(parentDirectory)
 
-    with open(stackFile, 'w+') as f:
+    with open(stackFile, 'wb+') as f:
       f.write(stackDescription)
   except IOError:
-      print 'Error'
+      print ('Error')
       print ('Could not save: ', stackFile)
 
 def buildTempFilePathForStackId(stackId):
@@ -54,8 +53,8 @@ def loadStackDescription(stackId):
       content =f.read()
       return content
   except IOError:
-      print 'Error'
-      print 'Cannot open/parse config file: ' + CONFIG_FILE
+      print ('Error')
+      print ('Cannot open/parse config file: ' + CONFIG_FILE)
 
 
 def describestackAws(stack_id):
@@ -88,12 +87,12 @@ def isInstancePlaying (instanceDescription):
   
   # check includes - returns false if key is missing or does not match
   for filter in CONFIG["INSTANCE_INCLUDE_FILTERS"]:
-    if not filter.keys()[0] in instanceDescription or not re.search(filter.values()[0], instanceDescription[filter.keys()[0]]):
+    if not list(filter.keys())[0] in instanceDescription or not re.search(list(filter.values())[0], instanceDescription[list(filter.keys())[0]]):
       return False
   
   # check excludes - return false if key exists and matches
   for filter in CONFIG["INSTANCE_EXCLUDE_FILTERS"]:
-    if filter.keys()[0] in instanceDescription and re.search(filter.values()[0], instanceDescription[filter.keys()[0]]):
+    if list(filter.keys())[0] in instanceDescription and re.search(list(filter.values())[0], instanceDescription[list(filter.keys())[0]]):
       return False
   return True
 
@@ -122,32 +121,40 @@ def buildMenu(stackName, stackId):
   menu.append({stackName: menuStack})
 
 for stackId in CONFIG["STACKS"]:
-  buildMenu(stackId.keys()[0], stackId.values()[0])
+  # print ("stackid:", stackId)
+  # print ("stackid key:", list(stackId.keys())[0])
+  stackName = list(stackId.keys())[0]
+  stackUUID = list(stackId.values())[0]
+  # print ("stackid val:", list(stackId.values())[0])
+  buildMenu(stackName, stackUUID)
+  # buildMenu(list(stackId.keys())[0], list(stackId.values())[0])
 
 # static menu
-print "OPS"
-print "---"
+print ("OPS")
+print ("---")
 
 lastUpdated = os.path.getmtime(os.path.abspath(os.path.join(buildTempFilePathForStackId("notrelevant"), '..')))
 print('As of {0:%Y-%m-%d %H:%M}'.format(datetime.datetime.fromtimestamp(lastUpdated)))
 
 # menu
 for elements in menu:
-  print elements.keys()[0]
-  for inst in elements[elements.keys()[0]]:
-    print "--" + inst['Hostname'] + " | color=" + ('green' if isOnline(inst) else 'red')
+  print(list(elements.keys())[0])
+  menuLabel = list(elements.keys())[0]
+  # print("inst: ", elements[menuLabel])
+  for inst in elements[menuLabel]:
+    print ("--" + inst['Hostname'] + " | color=" + ('green' if isOnline(inst) else 'red'))
     if (not isOnline(inst)):
       continue
 
     for instanceCommand in CONFIG['INSTANCE_ACTIONS']:
       # skip command if stack does not match
-      if (instanceCommand.get('stack', elements.keys()[0]) != elements.keys()[0] ):
+      if (instanceCommand.get('stack', menuLabel) != menuLabel ):
         continue
 
       if instanceCommand['type'] == 'command':
         normalizedCommand = normalizeCommand(instanceCommand['executable'], inst)
         if normalizedCommand != "N/A":
-          print "---- %s | bash='%s' terminal=true" % (instanceCommand['label'], normalizedCommand)
+          print ("---- %s | bash='%s' terminal=true" % (instanceCommand['label'], normalizedCommand))
       elif instanceCommand['type'] == 'script':
         normalizedCommand = normalizeCommand(instanceCommand['executable'], inst)
         params = []
@@ -155,9 +162,12 @@ for elements in menu:
           for i in range(len(instanceCommand['params'])):
             normalizedParam = normalizeCommand(instanceCommand['params'][i], inst)
             params.append( "param" + str(i+1) + "=" + normalizedParam)
-          print "---- %s | bash='%s' %s terminal=true" % (instanceCommand['label'], normalizedCommand, " ".join(params))
+          print ("---- %s | bash='%s' %s terminal=true" % (instanceCommand['label'], normalizedCommand, " ".join(params)))
 
-print "Refresh | terminal=false refresh=true"
+print ("TEST 1| bash=ls param1='-l -a' terminal=true")
+print ("TEST 2| bash='/Users/andras/work/helyes/bitbar-plugins/aws-opsworks-ssh/remote-cd-irb.sh' param1='54.252.209.251 $(ctae.sh -g CONFIG_PRIVATE_KEY_FILE) $(ctae.sh -g CONFIG_EC2_USER_NAME) /srv/www/shiftcare/current'    terminal=true")
+ 
+print ("Refresh | terminal=false refresh=true")
 # without that, auto refresh would refresh tempfile when app started
 # It may take a while so sticking with on demand manual refresh
-print "Refresh remote | bash=" + os.path.abspath(sys.argv[0]) + " param1=inValidateCache terminal=false refresh=true"
+print ("Refresh remote | bash=" + os.path.abspath(sys.argv[0]) + " param1=inValidateCache terminal=false refresh=true")
